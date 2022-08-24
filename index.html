@@ -7,15 +7,13 @@
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
   <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
 
-  <script>var baseUrl="https://fireclover.imk.im/_db/demo/demo/"</script>
-  <script src="https://fireclover.imk.im/_db/demo/demo/js/dat.gui"></script>
-  <script src="https://fireclover.imk.im/_db/demo/demo/js/3d-force-graph"></script>
-  <script src="https://fireclover.imk.im/_db/demo/demo/js/three"></script>
   <!--<script src="https://unpkg.com/three-spritetext"></script>
-  <script src="https://unpkg.com/three/examples/js/renderers/CSS2DRenderer.js"></script>-->
+  <script src="https://unpkg.com/three/examples/js/renderers/CSS2DRenderer.js"></script>
+
+  <script src="https://fireclover.imk.im/_db/demo/demo/js/three"></script>
 
 
-  <!--<script src="//unpkg.com/d3-dsv"></script>
+  <script src="//unpkg.com/d3-dsv"></script>
   <script src="//unpkg.com/d3-octree"></script>
   <script src="//unpkg.com/d3-force-3d"></script>-->
   
@@ -28,13 +26,15 @@
       user-select: none;
     }
   </style>
-
+  <script src="https://fireclover.imk.im/_db/demo/demo/js/dat.gui"></script>
+  <script src="https://fireclover.imk.im/_db/demo/demo/js/3d-force-graph"></script>
 </head>
 
 <body>
   <div id="3d-graph"></div>
-
   <script>
+  const baseUrl="https://fireclover.imk.im/_db/demo/demo/";
+  
     Array.prototype.unique_nodes = function() {
       if (this == undefined) {
           return [];
@@ -139,6 +139,7 @@ function makeTextSprite( message, parameters )
 	context.fillText( message, borderThickness, fontsize + borderThickness);
 	
 	// canvas contents will be used for a texture
+	const THREE = require('https://fireclover.imk.im/_db/demo/demo/js/three');
 	var texture = new THREE.Texture(canvas) 
 	texture.needsUpdate = true;
 
@@ -269,8 +270,7 @@ function makeTextSprite( message, parameters )
         //  }
         //})
         .nodeThreeObject(node => {
-	  const labelString = "" + node?.name;
-          const label = new SpriteText(labelString);
+          const label = new SpriteText(''+node?.name);
           label.material.depthWrite = false; // make sprite background transparent
           label.textHeight = 0.25;
           //if (node._id.split('/')[0] != 'vulnerability') {
@@ -282,7 +282,8 @@ function makeTextSprite( message, parameters )
             label.position.y = label.textHeight * 5;
             label.position.z = label.textHeight * 0.9;
             label.position.x = label.textHeight * 0.9;
-            sprite.add(makeTextSprite('test', { fontsize: 24, borderColor: {r:255, g:0, b:0, a:1.0}, backgroundColor: {r:255, g:100, b:100, a:0.8} }));
+            //sprite.add(makeTextSprite('test', { fontsize: 24, borderColor: {r:255, g:0, b:0, a:1.0}, backgroundColor: {r:255, g:100, b:100, a:0.8} }));
+	    sprite.add(label);
             return sprite;
           //}
         })
