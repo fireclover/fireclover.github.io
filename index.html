@@ -269,19 +269,20 @@ function makeTextSprite( message, parameters )
         //  }
         //})
         .nodeThreeObject(node => {
-          //const label = new SpriteText(node.name);
-          //label.material.depthWrite = false; // make sprite background transparent
-          //label.textHeight = 0.25;
+	  const labelString = node.name ?: "";
+          const label = new SpriteText(labelString);
+          label.material.depthWrite = false; // make sprite background transparent
+          label.textHeight = 0.25;
           //if (node._id.split('/')[0] != 'vulnerability') {
             const imgTexture = new THREE.TextureLoader().load(baseUrl+'icons/'+node._id.split('/')[0]+'.svg');
             const material = new THREE.SpriteMaterial({ map: imgTexture });
             const sprite = new THREE.Sprite(material);
             sprite.material.depthWrite = false;
             sprite.scale.set(12, 12);
-            //label.position.y = label.textHeight * 5;
-            //label.position.z = label.textHeight * 0.9;
-            //label.position.x = label.textHeight * 0.9;
-            //sprite.add(makeTextSprite('test', { fontsize: 24, borderColor: {r:255, g:0, b:0, a:1.0}, backgroundColor: {r:255, g:100, b:100, a:0.8} }));
+            label.position.y = label.textHeight * 5;
+            label.position.z = label.textHeight * 0.9;
+            label.position.x = label.textHeight * 0.9;
+            sprite.add(makeTextSprite('test', { fontsize: 24, borderColor: {r:255, g:0, b:0, a:1.0}, backgroundColor: {r:255, g:100, b:100, a:0.8} }));
             return sprite;
           //}
         })
