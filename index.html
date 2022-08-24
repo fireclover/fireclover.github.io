@@ -269,7 +269,7 @@ function makeTextSprite( message, parameters )
         //  }
         //})
         .nodeThreeObject(node => {
-	  const labelString = node.name ?: "";
+	  const labelString = node.get("name", "");
           const label = new SpriteText(labelString);
           label.material.depthWrite = false; // make sprite background transparent
           label.textHeight = 0.25;
