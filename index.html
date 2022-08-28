@@ -10,6 +10,9 @@
   <!--
   <script src="https://unpkg.com/three/examples/js/renderers/CSS2DRenderer.js"></script>
   <script src="https://fireclover.imk.im/_db/demo/demo/js/three"></script>
+<script src="https://fireclover.imk.im/_db/demo/demo/js/three-spritetext"></script>
+
+  <script src="https://fireclover.imk.im/_db/demo/demo/js/three"></script>
 
 
   <script src="//unpkg.com/d3-dsv"></script>
@@ -25,16 +28,27 @@
       user-select: none;
     }
   </style>
-  <script src="https://fireclover.imk.im/_db/demo/demo/js/dat.gui"></script>
   <script src="https://fireclover.imk.im/_db/demo/demo/js/3d-force-graph"></script>
-  <script src="https://unpkg.com/three-spritetext"></script>
+  <script src="https://fireclover.imk.im/_db/demo/demo/js/dat.gui"></script>
+  <script src="https://fireclover.imk.im/_db/demo/demo/js/three"></script>
+  <script src="https://fireclover.imk.im/_db/demo/demo/js/three-spritetext"></script>
+
 </head>
 
 <body>
   <div id="3d-graph"></div>
   <script>
-  const baseUrl="https://fireclover.imk.im/_db/demo/demo/";
+  var baseUrl="https://fireclover.imk.im/_db/demo/demo/";
+  /* global SpriteText */
+  /* global THREE */
+  /* global dat */
+  /* global fetch */
+  /* global ForceGraph3D */
+  /* global $ */
   
+
+
+
     Array.prototype.unique_nodes = function() {
       if (this == undefined) {
           return [];
@@ -64,9 +78,9 @@
                 (a[j].source._id && a[j].target._id && a[i].source == a[j].source._id && a[i].target == a[j].target._id)
                   ) {
                   a.splice(j--, 1);
-            console.log("I " + a[i].source._id + " " + a[j].source._id + " J");
+                  //console.log("I " + a[i].source._id + " " + a[j].source._id + " J");
             } else {
-                  console.log(a[i]);
+                  //console.log(a[i]);
                 }
           }
         } else {
@@ -139,8 +153,7 @@ function makeTextSprite( message, parameters )
 	context.fillText( message, borderThickness, fontsize + borderThickness);
 	
 	// canvas contents will be used for a texture
-	const THREE = require('https://fireclover.imk.im/_db/demo/demo/js/three');
-	var texture = new THREE.Texture(canvas) 
+	var texture = new THREE.Texture(canvas);
 	texture.needsUpdate = true;
 
 	var spriteMaterial = new THREE.SpriteMaterial( 
@@ -152,102 +165,171 @@ function makeTextSprite( message, parameters )
 
 
 
-
     // controls
     const controls = { 'DAG Orientation': 'td'};
     const gui = new dat.GUI();
     gui.add(controls, 'DAG Orientation', ['td', 'bu', 'lr', 'rl', 'zout', 'zin', 'radialout', 'radialin', null])
       .onChange(orientation => graph && graph.dagMode(orientation));
-    var startNode = {'StartNode': 'securityScan/102891'};
+  
+    var sNode = 'missing';
+    $.ajax({
+      url: baseUrl+'startNode',
+      async: false,
+      dataType: 'json',
+      success: function (response) {
+        sNode=response
+      }
+    });
+    var startNode = {'StartNode': sNode};
+    console.log("startNode " + startNode.StartNode);
 
     var undrawnGraph = {nodes:[], links:[]};
 
     let controller = new function() {  
-        this.securityTests=true;
+        this.securityScans=true;
         this.vulnerabilities=true;
         this.artifacts=true;
-        this.images=true;
+        this.dockerImages=true;
+        this.low=true;
+        this.medium=true;
+        this.high=true;
+        this.critical=true;
     }
+    
     let f1 = gui.addFolder('Visible Node Types');
-    f1.add(controller, 'vulnerabilities').listen().onChange(value => { 
-          vulnerabilities=value;
-          graph && filterGraphNodes(graph, controller);
-    });
     f1.add(controller, 'artifacts').listen().onChange(value => { 
-          artifacts=value;
+          this.artifacts=value;
           graph && filterGraphNodes(graph, controller);
         });
+    f1.add(controller, 'dockerImages').listen().onChange(value => { 
+          this.dockerImages=value;
+          graph && filterGraphNodes(graph, controller);
+    });
+    f1.add(controller, 'securityScans').listen().onChange(value => { 
+          this.securityScans=value;
+          graph && filterGraphNodes(graph, controller);
+    });      
+    f1.add(controller, 'vulnerabilities').listen().onChange(value => { 
+          this.vulnerabilities=value;
+          graph && filterGraphNodes(graph, controller);
+    });
+    
+    let f2 = gui.addFolder('Vulnerability Severity');
+    f2.add(controller, 'low').listen().onChange(value => { 
+          this.low=value;
+          graph && filterGraphNodes(graph, controller);
+    });
+    f2.add(controller, 'medium').listen().onChange(value => { 
+          this.medium=value;
+          graph && filterGraphNodes(graph, controller);
+    });
+    f2.add(controller, 'high').listen().onChange(value => { 
+          this.high=value;
+          graph && filterGraphNodes(graph, controller);
+    });
+    f2.add(controller, 'critical').listen().onChange(value => { 
+          this.critical=value;
+          graph && filterGraphNodes(graph, controller);
+    });    
+
+    function getSourceAndTargetLinks(nodeId, links) {
+      var nodeSources = [];
+      var nodeTargets = [];
+      var keepLinks = [];
+      for (var j=0;j<links.length;j++) {
+        if (links[j].source._id == nodeId) nodeSources.push(links[j]);
+        else if (links[j].target._id == nodeId) nodeTargets.push(links[j]);
+        else keepLinks.push(links[j]);
+      }
+
+      return {nodeSources, nodeTargets, keepLinks};
+    }
+    
+    function getUpdatedLinks(sources, targets) {
+      var newLinks = [];
+      for(var i=0; i<sources.length && i<targets.length; i++) {
+        newLinks.push({'source': targets[i].source, 'target': sources[i].target, 'type': 'temp'});
+      }
+      return newLinks;
+    }
 
     function filterGraphNodes(graph, nodesTypes) {
       let types = [];
-      nodesTypes.securityTests && types.push('securityScan');
+      let severities = [];
+      nodesTypes.low && severities.push('Low');
+      nodesTypes.medium && severities.push('Medium');
+      nodesTypes.high && severities.push('High');
+      nodesTypes.critical && severities.push('Critical');
+      
+      nodesTypes.securityScans && types.push('securityScan');
       nodesTypes.artifacts && types.push('artifact');
-      nodesTypes.images && types.push('dockerImage');
+      nodesTypes.dockerImages && types.push('dockerImage');
       nodesTypes.vulnerabilities && types.push('vulnerability');
-      const updatedNodes = [];
-//          fetch('http://127.0.0.1:8529/_db/_system/getting-started/bi-graph/'+encodeURIComponent(startNode.StartNode)).then(res => res.json())
-//              .then(data => (!data) ? null : graph.graphData(data));
+
+      var updatedNodes = [];
       let { nodes, links } = graph.graphData();
       nodes = nodes.concat(undrawnGraph.nodes).unique_nodes();
       console.log("links " + links.length);
       links = links.concat(undrawnGraph.links).unique_links();
       console.log("links " + links.length);
-      let updatedLinks = [];
+      var updatedLinks = [];
+      var recalcLinks = [];
       undrawnGraph = {nodes:[], links:[]};
-      //let updatedLinks = links.copy();
+      for (var i=0;i<links.length;i++) {
+          if (types.includes(links[i].source._id.split('/')[0]) && types.includes(links[i].target._id.split('/')[0]) && links[i].type != 'temp') {
+            updatedLinks.push(links[i]);
+          } else {
+            recalcLinks.push(links[i]);
+          }
+      }
       for (var i=0;i<nodes.length;i++) {
-        if (nodes[i]._id && nodes[i]._id.includes('/')) {
-          if (types.includes(nodes[i]._id.split('/')[0])) {
+          //console.log(nodes[i]?.severity)
+          if (types.includes(nodes[i]?.type)) {
             updatedNodes.push(nodes[i]);
           } else {
             undrawnGraph.nodes.push(nodes[i]);
+            let {nodeSources, nodeTargets, recalcLinks} = getSourceAndTargetLinks(nodes[i]._id, links);
+            updatedLinks = updatedLinks.concat(getUpdatedLinks(nodeSources, nodeTargets));
+            //console.log("undraw " + nodeSources.concat(nodeTargets)[0]._id); 
+            undrawnGraph.links = undrawnGraph.links.concat(nodeSources).concat(nodeTargets);
           }
-          //console.log("undraw " + undrawnGraph.nodes.length);
-        }
       }
-      console.log("links bf" + links.length);
-      for (var j=0;j<links.length;j++) {
-      //console.log("links " + updatedLinks.length);
-        //if (links[j].source._id == nodes[i]._id && links[j].target._id == nodes[i]._id) {
-        if (types.includes(links[j].source._id.split('/')[0]) && types.includes(links[j].target._id.split('/')[0])) {
-            updatedLinks.push(links[j]);
-            //console.log(updatedLinks.length);
-          //}
-        } else {
-          undrawnGraph.links.push(links[j]);
-        }
-      }
-        if (null) {
-          undrawnGraph.nodes.push(nodes[i]);
-          var curLink;
-          for (var j=0;j<updatedLinks.length;j++) {
-            //curLink = links[j];
-          //while (curLink = links.pop()) {
-            //if(links[i]._to == nodes[i]._id || links[i]._from == nodes[i]._id) {
-            //console.log(nodes[i]);
-            //console.log(curLink);
-            if (updatedLinks[j] && nodes[i]) {
-              if(updatedLinks[j].source._id == nodes[i]._id || updatedLinks[j].target._id == nodes[i]._id) {
-                  undrawnGraph.links.push(updatedLinks[j]);
-              } else {
-                  updatedLinks.splice(j, 1);
-              }
-            }
+      if (types.includes('vulnerability') && severities.length != 4) {
+        var newNodes = [];
+        var newLinks = [];
+        for (var i=0;i<updatedNodes.length;i++) {
+          //console.log(nodes[i]?.severity)
+          if (severities.includes(updatedNodes[i]?.severity)) {
+            let {nodeSources, nodeTargets, recalcLinks} = getSourceAndTargetLinks(updatedNodes[i]._id, updatedLinks);
+            newLinks = newLinks.concat(nodeSources);//.concat(nodeTargets);
+            newNodes.push(updatedNodes[i]);
+          } else if (updatedNodes[i]?.severity != null) {
+            undrawnGraph.nodes.push(updatedNodes[i]);
+            let {nodeSources, nodeTargets, recalcLinks} = getSourceAndTargetLinks(updatedNodes[i]._id, updatedLinks);
+            //newLinks = newLinks.concat(getUpdatedLinks(nodeSources, nodeTargets));
+            //console.log("undraw " + nodeSources.concat(nodeTargets)[0]._id); 
+            undrawnGraph.links = undrawnGraph.links.concat(nodeSources).concat(nodeTargets);          
+          } else {
+            let {nodeSources, nodeTargets, recalcLinks} = getSourceAndTargetLinks(updatedNodes[i]._id, updatedLinks);
+            newLinks = newLinks.concat(nodeSources);//.concat(nodeTargets);
+            newNodes.push(updatedNodes[i]);             
           }
         }
+        updatedNodes = newNodes;
+        updatedLinks = newLinks;
+      }
+      
       undrawnGraph = {nodes: undrawnGraph.nodes.unique_nodes(), links: undrawnGraph.links.unique_links()};
       graph.graphData({nodes: updatedNodes.unique_nodes(), links: updatedLinks.unique_links()});
     }
       
-
     //const gData = {nodes:[{id: 'bad id',_id:'bad/id', name: 'name'}], links:[]};
-
     //fetch('http://127.0.0.1:8529/_db/_system/getting-started/bi-graph/'+encodeURIComponent(startNode.StartNode)).then(res => res.json()).then(data => { gData['nodes']=data.nodes; gData['links']=data.links });
 
     // Add a string controller.
     gui.add(startNode, 'StartNode')
       .onFinishChange(node => graph && 
-          fetch(baseUrl+'bi-graph/'+encodeURIComponent(node)).then(res => res.json())
+          fetch(baseUrl+'graph/'+encodeURIComponent(node)).then(res => res.json())
               .then(data => (!data) ? null : graph.graphData(data))
           );
     //console.log("gData links " + gData.links.length.toString());
@@ -255,16 +337,17 @@ function makeTextSprite( message, parameters )
     const elem = document.getElementById('3d-graph');
     let distance = 800;
     let focusedNode = null
+    //const ForceGraph3D = require('https://fireclover.imk.im/_db/demo/demo/js/3d-force-graph');
     const graph = ForceGraph3D()
-      (elem)
-        .jsonUrl(baseUrl+'bi-graph/'+encodeURIComponent(startNode.StartNode))
+      (elem) // bi-graph
+        .jsonUrl(baseUrl+'graph/'+encodeURIComponent(startNode.StartNode))
         .nodeLabel(d => d.name)
         .linkDirectionalParticles('value')
         .backgroundColor('black')
         .linkDirectionalParticleSpeed(d => d.value * 0.001)
         .linkWidth(3)
         .linkDirectionalParticleWidth(2)
-        //.nodeColor(node =>  {
+        //.nodeColor(n =>  n?.type != 'vulnerability' && console.log("node: "+n.name) ? 'red' : null)
         //  if (node._id.split('/')[0] == 'vulnerability') {
         //    return 'red';
         //  }
@@ -274,15 +357,35 @@ function makeTextSprite( message, parameters )
           label.material.depthWrite = false; // make sprite background transparent
           label.textHeight = 0.25;
           //if (node._id.split('/')[0] != 'vulnerability') {
-            const imgTexture = new THREE.TextureLoader().load(baseUrl+'icons/'+node._id.split('/')[0]+'.svg');
+            const imgTexture = new THREE.TextureLoader().load(baseUrl+'icons/'+node?.type+'.svg');
             const material = new THREE.SpriteMaterial({ map: imgTexture });
             const sprite = new THREE.Sprite(material);
             sprite.material.depthWrite = false;
             sprite.scale.set(12, 12);
+            label.position.x = label.textHeight * 0.9;
             label.position.y = label.textHeight * 5;
             label.position.z = label.textHeight * 0.9;
-            label.position.x = label.textHeight * 0.9;
-            //sprite.add(makeTextSprite('test', { fontsize: 24, borderColor: {r:255, g:0, b:0, a:1.0}, backgroundColor: {r:255, g:100, b:100, a:0.8} }));
+              switch(node?.severity) {
+                case 'Critical':
+                  material.color.set(0xff00ff);
+                  break;
+                case 'High':
+                  material.color.set(0xff0000);
+                  break;
+                case 'Medium':
+                  material.color.set(0xffaa00);
+                  break;  
+                case 'Low':
+                  material.color.set(0x00ff00);
+                  break;                  
+                default:
+              }
+              //const text = makeTextSprite('test', { fontsize: 14, borderColor: {r:255, g:0, b:0, a:1.0}, backgroundColor: {r:255, g:100, b:100, a:0.8} });
+              //text.position.x = label.position.x;
+              //text.position.y = label.position.y;
+              //text.position.z = label.position.z;
+              //sprite.add(text);
+            
 	    sprite.add(label);
             return sprite;
           //}
@@ -290,9 +393,9 @@ function makeTextSprite( message, parameters )
         //.nodeThreeObjectExtend(true)
         .onNodeClick(node => {
           let { nodes, links } = graph.graphData();
-          fetch(baseUrl+'graph/'+encodeURIComponent(node._id)).then(res => res.json()).then(data => {
+          fetch(baseUrl+'bi-graph/'+encodeURIComponent(node._id)).then(res => res.json()).then(data => {
             if (data.nodes &&  data.links) {
-              graph.graphData({nodes: nodes.concat(data.nodes).unique_nodes(), links: links.concat(data.links).unique_links()})
+              graph.graphData({nodes: nodes.concat(data.nodes).unique_nodes(), links: links.concat(data.links).unique_links()});
             }
           });
         })
@@ -307,8 +410,21 @@ function makeTextSprite( message, parameters )
             3000  // ms transition duration
           );
 
-          let { nodes, links } = graph.graphData();
-          fetch(baseUrl+'node/'+encodeURIComponent(node._id)).then(res => res.json()).then(data => node = data[0]);
+          fetch(baseUrl+'node/'+encodeURIComponent(node._id)).then(res => res.json()).then(data => {
+            console.log(data);
+            window.open(baseUrl+'node/'+encodeURIComponent(node._id), "_blank");
+            // let gd = graph.graphData();
+            // const material = new THREE.SpriteMaterial();
+            // const sprite = new THREE.Sprite(material);
+            // const text = makeTextSprite(data[0], { fontsize: 14, borderColor: {r:255, g:0, b:0, a:1.0}, backgroundColor: {r:255, g:100, b:100, a:0.8} });
+            // sprite.add(text);
+            //   gd.nodes.push(sprite);
+            //   graph.graphData(gd);
+          });
+              //text.position.x = label.position.x;
+              //text.position.y = label.position.y;
+              //text.position.z = label.position.z;
+              //sprite.add(text);          
           graph.refresh();
         });
         // Spread nodes a little wider
